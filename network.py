@@ -1077,7 +1077,7 @@ class SurfPosNet(nn.Module):
                                                    dim_feedforward=1024, dropout=0.1)
         self.net = nn.TransformerEncoder(layer, 12, nn.LayerNorm(self.embed_dim))
 
-        self.p_embed = nn.Sequential(
+        self.pos_embed = nn.Sequential(
             nn.Linear(6, self.embed_dim),
             nn.LayerNorm(self.embed_dim),
             nn.SiLU(),
@@ -1108,17 +1108,17 @@ class SurfPosNet(nn.Module):
         """ forward pass """
         bsz = timesteps.size(0)
         time_embeds = self.time_embed(sincos_embedding(timesteps, self.embed_dim)).unsqueeze(1)  
-        p_embeds = self.p_embed(surfPos)
+        pos_embeds = self.pos_embed(surfPos)
     
-        if self.use_cf:  # classifier-free
+        if self.use_cf:  # classifier-free guidance
             if is_train:
                 # randomly set 10% to uncond label
                 uncond_mask = torch.rand(bsz,1) <= 0.1  
                 class_label[uncond_mask] = 0
-            c_embeds = self.class_embed(class_label) 
-            tokens = p_embeds + time_embeds + c_embeds
+            class_embeds = self.class_embed(class_label) 
+            tokens = pos_embeds + time_embeds + class_embeds
         else:
-            tokens = p_embeds + time_embeds
+            tokens = pos_embeds + time_embeds
        
         output = self.net(src=tokens.permute(1,0,2)).transpose(0,1)
         pred = self.fc_out(output)
@@ -1128,7 +1128,7 @@ class SurfPosNet(nn.Module):
 
 class SurfZNet(nn.Module):
     """
-    Transformer-based latent diffusion model for surface position
+    Transformer-based latent diffusion model for surface geometry (shape details)
     """
     def __init__(self, use_cf):
         super(SurfZNet, self).__init__()
